@@ -1,0 +1,9 @@
+global:
+  default_newer_than: "2d" #ensure string
+
+newsletters:
+  - name: "TLDR AI"
+    email: "dan@tldrnewsletter.com"
+
+  - name: "TLDR Founders"
+    email: "dan@tldrnewsletter.com"
