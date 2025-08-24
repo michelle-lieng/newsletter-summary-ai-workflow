@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup, Comment
 import base64
 from datetime import datetime
 
+from urllib.parse import unquote
+
 def get_gmail_service(
     port: int = 8002,
     SCOPES: list = ["https://www.googleapis.com/auth/gmail.readonly"]
@@ -182,6 +184,56 @@ def clean_email_html(html: str) -> str:
     # 4) return only body inner HTML (avoid <html><body> wrappers)
     return soup.body.decode_contents() if soup.body else str(soup)
 
+
+def _real_url(href: str) -> str:
+    """Decode tracking links and return the first http(s) URL."""
+    s = unquote(href or "")
+    m = re.search(r"(https?://[^\s\"'<>]+)", s)
+    return m.group(1) if m else (href or "")
+
+def _norm_text(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").replace("\xa0", " ")).strip()
+
+def chunk_text_blocks(html: str, email_subject: str, email_sender):
+    """
+    Returns a list of dicts:
+      [{ "heading": str|None, "content": str, "links": [str, ...] }, ...]
+    """
+    # Parse the ALREADY-CLEANED html (run clean_email_html first)
+    soup = BeautifulSoup(html, "html.parser")
+
+    chunks = []
+    for block in soup.select("div.text-block"):
+        # skip blocks that themselves contain an H1
+        if block.find("h1"):
+            continue
+
+        # 1) Heading = closest previous <h1>
+        h1 = block.find_previous("h1")
+        heading = _norm_text(h1.get_text(" ", strip=True)) if h1 else None
+
+        # 2) Content = text of the block
+        content = _norm_text(block.get_text(" ", strip=True))
+        if len(content) <=1:
+            continue
+
+        # 3) Links inside the block (order-preserving de-dup)
+        links, seen = [], set()
+        for a in block.find_all("a", href=True):
+            url = _real_url(a["href"])
+            if url and url not in seen:
+                seen.add(url)
+                links.append(url)
+
+        chunks.append({
+            "email_sender": email_sender,
+            "email_subject": email_subject,
+            "heading": heading,
+            "content": content,
+            "links": links})
+
+    return chunks
+
 if __name__ == "__main__":
     # Basic logging setup; change to DEBUG for more verbosity
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -198,11 +250,11 @@ if __name__ == "__main__":
         payload = extract_messages(message_id).get("payload", {})
         from pprint import pprint
         #pprint(payload)
-        # headers = payload.get("headers", [])
+        headers = payload.get("headers", [])
         # #print(headers)
-        # subject = _header(headers, "Subject", "(no subject)")
-        # from_ = _header(headers, "From", "")
-        # date_raw = _header(headers, "Date", "")
+        subject = _header(headers, "Subject", "(no subject)")
+        from_ = _header(headers, "From", "")
+        #date_raw = _header(headers, "Date", "")
         # print(subject, from_, date_raw)
         # try:
         #     date = str(datetime.strptime(date_raw[:31], "%a, %d %b %Y %H:%M"))
@@ -213,3 +265,6 @@ if __name__ == "__main__":
         #print(text)
         cleaned = clean_email_html(text)
         #print(cleaned)
+        chunks = chunk_text_blocks(cleaned, subject, from_)
+        #pprint(chunks, sort_dicts=False)
+        
