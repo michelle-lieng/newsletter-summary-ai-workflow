@@ -12,74 +12,34 @@ import re
 
 def get_gmail_service(
     port: int = 8002,
-    credentials_path: str = "credentials.json",
-    token_path: str = "token.json"
+    SCOPES: list = ["https://www.googleapis.com/auth/gmail.readonly"]
 ):
     """
     Return an authenticated Gmail API service client.
-
-    What this does:
-      1) Tries to load an existing OAuth token from `token_path`
-      2) If token is expired but refreshable, refresh it
-      3) Otherwise launches a local OAuth flow (opens browser) using `credentials_path`
-      4) Saves a fresh token to `token_path`
-      5) Builds and returns the Gmail service
-
-    Raises:
-      FileNotFoundError: if `credentials.json` is missing and we must re-auth
-      RuntimeError: for OAuth flow or service build failures
     """
-    scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
+    
     creds = None
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first time.
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
-    # 1) Load cached token if present
-    if os.path.exists(token_path):
-        try:
-            creds = Credentials.from_authorized_user_file(token_path, scopes)
-            logging.info("Loaded cached OAuth token from %s", token_path)
-        except Exception as e:
-            logging.warning("Failed to read existing token (%s). Will re-authenticate.", e)
-            creds = None
-
-    # 2) Refresh or 3) Re-authenticate if needed
+    # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                logging.info("Refreshed OAuth token.")
-            except RefreshError as e:
-                logging.warning("Refresh token invalid/revoked (%s). Re-authenticating.", e)
-                creds = None  # fall through to re-auth
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "credentials.json", SCOPES
+            )
+            creds = flow.run_local_server(port=port, prompt='consent') 
+            # add prompt = consent to force field "refresh_token" in token.json
+        # Save the credentials for the next run
+        with open("token.json", "w") as token:
+            token.write(creds.to_json())
 
-        if not creds:
-            # Need the client secrets to run the OAuth flow
-            if not os.path.exists(credentials_path):
-                raise FileNotFoundError(
-                    f"Missing '{credentials_path}'. "
-                    "Download an OAuth 2.0 Client ID (Desktop app) from Google Cloud Console "
-                    "and place it next to this script."
-                )
-            # Try chosen port; if busy, fall back to any free port
-            try:
-                flow = InstalledAppFlow.from_client_secrets_file(credentials_path, scopes)
-                creds = flow.run_local_server(port=port, open_browser=True)
-            except OSError as oe:
-                logging.warning("Port %s unavailable (%s). Falling back to a random free port.", port, oe)
-                flow = InstalledAppFlow.from_client_secrets_file(credentials_path, scopes)
-                creds = flow.run_local_server(port=0, open_browser=True)
-            except Exception as e:
-                raise RuntimeError(f"OAuth flow failed: {e}") from e
-
-        # 4) Persist token for next run
-        try:
-            with open(token_path, "w") as token:
-                token.write(creds.to_json())
-            logging.info("Saved new token to %s", token_path)
-        except Exception as e:
-            logging.error("Could not write token file '%s': %s", token_path, e)
-
-    # 5) Build Gmail service
     try:
+        # Call the Gmail API
         service = build("gmail", "v1", credentials=creds)
         logging.info("Signed into Gmail successfully.")
         return service
