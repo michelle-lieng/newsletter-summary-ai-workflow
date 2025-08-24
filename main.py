@@ -71,21 +71,24 @@ def build_query(email: str,
 
 def list_message_ids(service, 
                      query: str, 
-                     max_results: int = 50) -> List[str]:
-    
-    ids, page_token = [], None
-    
-    while True:
-        resp = service.users().messages().list(
-            userId="me", q=query, maxResults=min(max_results, 100), pageToken=page_token
-        ).execute()
-        for m in resp.get("messages", []):
-            ids.append(m["id"])
-            if len(ids) >= max_results:
-                return ids
-        page_token = resp.get("nextPageToken")
-        if not page_token or len(ids) >= max_results:
-            return ids
+                     max_results: int = 100) -> List[str]:
+    """
+    Get all newsletter message ids.
+    Check here: https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list
+    """
+    message_ids = []
+
+    results = (service.users().messages().list(userId="me", 
+                                               q=query,
+                                               maxResults=max_results).execute())
+    messages = results.get("messages", [])
+
+    if not messages:
+        print("No messages found.")
+
+    for message in messages:
+        message_ids.append(message["id"])
+    return message_ids
 
 if __name__ == "__main__":
     # Basic logging setup; change to DEBUG for more verbosity
