@@ -46,26 +46,28 @@ def get_gmail_service(
     except Exception as e:
         raise RuntimeError(f"Failed to build Gmail service: {e}") from e
 
-# ---------- Query helpers ----------
-def parse_newer_than(newer_than: str) -> str:
-    newer_than = newer_than.strip().lower()
-    if re.fullmatch(r"\d+[dw]", newer_than): 
-        return f"newer_than:{newer_than}"  # 7d / 2w
-    if re.fullmatch(r"\d+", newer_than):     
-        return f"newer_than:{newer_than}d" # "14" -> 14d
-
 def build_query(email: str, 
                 newsletter_name: str,
                 newer_than: str) -> str:
     """
     Creates something e.g. like
-    in:inbox newer_than:2d from:dan@tldrnewsletter.com from:"TLDR AI" 
+    in:inbox newer_than:"2d" from:"dan@tldrnewsletter.com" from:"TLDR AI" 
     which can filter down your gmail inbox.
+
+    Check here for the formats allowed
+    https://support.google.com/mail/answer/7190?hl=en&co=GENIE.Platform%3DAndroid
+    
+    For newer_than can do:
+    "Search for emails newer than a time period. 
+    Use d (day), m (month), or y (year)."
     """
-    parts = ['in:inbox', f'from:"{email}"', f'from:"{newsletter_name}"']
-    nt = parse_newer_than(newer_than)
-    parts.append(nt)
-    return " ".join(parts)
+    newer_than = newer_than.strip().lower()
+
+    # check if newer_than in correct format
+    if not re.fullmatch(r"\d+[dmy]", newer_than):
+        raise ValueError("newer_than must be a number followed by 'd', 'm', or 'y' (e.g., 4d, 9m, 1y).")
+
+    return f'in:inbox from:"{email}" from:"{newsletter_name}" newer_than:{newer_than}'
 
 def list_message_ids(service, 
                      query: str, 
