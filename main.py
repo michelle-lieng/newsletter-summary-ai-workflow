@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -9,6 +9,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 import re
+import base64
+from datetime import datetime
 
 def get_gmail_service(
     port: int = 8002,
@@ -90,6 +92,39 @@ def list_message_ids(service,
         message_ids.append(message["id"])
     return message_ids
 
+def extract_messages(message_id: str):
+    msg = (service.users().messages().get(userId="me", 
+                                          id=message_id,
+                                          format="full").execute())
+    return msg
+
+def _header(headers: List[Dict[str,str]], name: str, default: str="") -> str:
+    return next(
+        (h["value"] for h in headers if h.get("name").lower()==name.lower())
+        , default)
+  
+def _decode_body(data_b64url: str) -> str:
+    return base64.urlsafe_b64decode(data_b64url.encode("utf-8")).decode("utf-8", errors="ignore")
+
+def _extract_text(payload: Dict[str,Any]) -> str:
+    """
+    Prefer text/html -> strip tags; else text/plain.
+    Walks nested parts.
+    """
+    parts = payload.get("parts", [])
+    for part in parts:
+        data = part.get("body").get("data")
+        mime = part.get("mimeType")
+        # get mimeType = "text/html"
+        if mime == "text/html":
+            raw = _decode_body(data)
+            return raw.strip()
+        # fall back get mimeType = "text/plain"
+        # NOTE TO SELF: Figure out later
+        # elif mime == "text/plain":
+        #     raw = _decode_body(data)
+        #     return raw.strip()
+
 if __name__ == "__main__":
     # Basic logging setup; change to DEBUG for more verbosity
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -98,6 +133,24 @@ if __name__ == "__main__":
     service = get_gmail_service(port=8002)
 
     ############ STEP 2: Given the newspapers in the config.yaml then extract those newspapers
-    query = build_query("dan@tldrnewsletter.com","TLDR AI","2")
+    query = build_query("dan@tldrnewsletter.com","TLDR AI","2d")
     print(query)
-    print(list_message_ids(service, query, max_results=3))
+    message_ids = list_message_ids(service, query)
+    for message_id in message_ids:
+        print(message_id)
+        payload = extract_messages(message_id).get("payload", {})
+        from pprint import pprint
+        #pprint(payload)
+        # headers = payload.get("headers", [])
+        # #print(headers)
+        # subject = _header(headers, "Subject", "(no subject)")
+        # from_ = _header(headers, "From", "")
+        # date_raw = _header(headers, "Date", "")
+        # print(subject, from_, date_raw)
+        # try:
+        #     date = str(datetime.strptime(date_raw[:31], "%a, %d %b %Y %H:%M"))
+        # except Exception:
+        #     date = date_raw or ""
+        # print(date)
+        text = _extract_text(payload)
+        print(text)
