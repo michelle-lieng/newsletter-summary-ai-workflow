@@ -1,5 +1,5 @@
 global:
-  default_newer_than: "2d" #ensure string
+  newer_than: "2d" #ensure string
 
 newsletters:
   - name: "TLDR AI"
@@ -7,3 +7,18 @@ newsletters:
 
   - name: "TLDR Founders"
     email: "dan@tldrnewsletter.com"
+
+preferences:
+  interests: # show items that match *any* of these
+    - "agents"
+    - "vector search"
+    - "RAG"
+    - "OpenSearch"
+    - "LangGraph"
+    - "NotebookLM"
+  disinterests: # hide items that mention any of these
+    - "crypto"
+    - "NFT"
+    - "jobs"
+    - "sponsor"
+    - "web3"
