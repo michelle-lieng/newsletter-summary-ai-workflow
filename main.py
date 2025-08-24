@@ -9,6 +9,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 import re
+from bs4 import BeautifulSoup, Comment
 import base64
 from datetime import datetime
 
@@ -115,10 +116,15 @@ def _extract_text(payload: Dict[str,Any]) -> str:
     for part in parts:
         data = part.get("body").get("data")
         mime = part.get("mimeType")
-        # get mimeType = "text/html"
+
         if mime == "text/html":
             raw = _decode_body(data)
             return raw.strip()
+        # if mime == "text/plain":
+        #     raw = _decode_body(data)
+        #     soup = BeautifulSoup(raw, 'html.parser')
+        #     return soup.get_text()
+        
         # fall back get mimeType = "text/plain"
         # NOTE TO SELF: Figure out later
         # elif mime == "text/plain":
