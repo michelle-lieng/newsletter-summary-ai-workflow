@@ -301,6 +301,7 @@ if __name__ == "__main__":
     query = build_query("dan@tldrnewsletter.com","TLDR AI","4d")
     print(query)
     message_ids = list_message_ids(service, query)
+    all_chunks = []
     for message_id in message_ids:
         print(message_id)
         payload = extract_messages(message_id).get("payload", {})
@@ -318,17 +319,16 @@ if __name__ == "__main__":
         #     date = date_raw or ""
         # print(date)
         text = _extract_text(payload)
-        #print(text)
+        print(text)
         cleaned = clean_email_html(text)
         #print(cleaned)
         chunks = chunk_text_blocks(cleaned, subject, from_)
+        all_chunks += chunks
         #pprint(chunks, sort_dicts=False)
         
-        interests = ["notebookLLM", "LangGraph", "Claude Code"]
-        scored = score_chunks_against_interests(chunks, interests)
-        #pprint(scored, sort_dicts=False)
+    interests = ["notebookLLM", "LangGraph", "Claude Code"]
+    scored = score_chunks_against_interests(all_chunks, interests)
+    #pprint(scored, sort_dicts=False)
 
-        kept_chunks = filter_scored_chunks(scored)
-        pprint(kept_chunks, sort_dicts=False)
-
-        # Note to self need to combine the newsletter chunks together into one list
+    kept_chunks = filter_scored_chunks(scored)
+    pprint(kept_chunks, sort_dicts=False)
