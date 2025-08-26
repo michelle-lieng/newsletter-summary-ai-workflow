@@ -4,6 +4,8 @@ from typing import Optional, List, Dict, Any
 import google.generativeai as genai
 from dotenv import load_dotenv
 import os
+from email.message import EmailMessage
+
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -25,7 +27,8 @@ load_dotenv()
 
 def get_gmail_service(
     port: int = 8002,
-    SCOPES: list = ["https://www.googleapis.com/auth/gmail.readonly"]
+    SCOPES: list = ["https://www.googleapis.com/auth/gmail.readonly",
+                    "https://www.googleapis.com/auth/gmail.send"]
 ):
     """
     Return an authenticated Gmail API service client.
@@ -324,6 +327,22 @@ def generate_summary(chunks: List[Dict]) -> str:
     resp = model.generate_content("Summarize the findings into a straightforward and easy to read format.")
     return resp.text
 
+def send_email(service, sender, to, subject, body_text):
+    # Create the email
+    message = EmailMessage()
+    message.set_content(body_text)
+    message["To"] = to
+    message["From"] = sender
+    message["Subject"] = subject
+
+    # Encode as base64url
+    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    create_message = {"raw": encoded_message}
+
+    # Send
+    send_message = service.users().messages().send(userId="me", body=create_message).execute()
+    print(f"Message sent! ID: {send_message['id']}")
+
 if __name__ == "__main__":
     # Basic logging setup; change to DEBUG for more verbosity
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -369,3 +388,11 @@ if __name__ == "__main__":
 
     summary = generate_summary(kept_chunks)
     print(summary)
+
+    send_email(
+        service,
+        sender=os.getenv("EMAIL_FROM"),
+        to=os.getenv("EMAIL_TO"),
+        subject="Hello from Gmail API!",
+        body_text=summary
+    )
