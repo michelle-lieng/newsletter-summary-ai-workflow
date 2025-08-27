@@ -1,5 +1,4 @@
-global:
-  newer_than: "2d" #ensure string
+newer_than: "4d" #ensure string
 
 newsletters:
   - name: "TLDR AI"
@@ -10,10 +9,7 @@ newsletters:
 
 preferences:
   interests: # show items that match *any* of these
-    - "agents"
-    - "vector search"
-    - "RAG"
-    - "OpenSearch"
+    - "ClaudeCode"
     - "LangGraph"
     - "NotebookLM"
   disinterests: # hide items that mention any of these
